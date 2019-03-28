@@ -1,0 +1,129 @@
+buildscript {
+    ext {
+        springBootVersion = '2.1.2.RELEASE'
+    }
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+        classpath("com.google.protobuf:protobuf-gradle-plugin:${protobufPluginVersion}")
+        classpath("se.transmode.gradle:gradle-docker:${gradleDockerVersion}")
+    }
+}
+
+
+apply plugin: 'java'
+apply plugin: 'docker'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'com.google.protobuf'
+
+group = projectGroup
+version = projectVersion
+
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+tasks.withType(JavaCompile) {
+	options.encoding = 'UTF-8'
+}
+
+
+
+repositories {
+    mavenCentral()
+}
+dependencies {
+    implementation "io.grpc:grpc-netty-shaded:${grpcVersion}"
+    implementation "io.grpc:grpc-protobuf:${grpcVersion}"
+    implementation "io.grpc:grpc-stub:${grpcVersion}"
+    implementation "io.grpc:grpc-services:${grpcVersion}"
+    implementation "io.netty:netty-tcnative-boringssl-static:${nettyTcNativeVersion}"
+    implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"
+    implementation "io.github.lognet:grpc-spring-boot-starter:${springBootStarterVersion}"
+    implementation "log4j:log4j:${log4jVersion}"
+
+    testImplementation "io.grpc:grpc-testing:${grpcVersion}"
+
+    compile "com.google.api.grpc:proto-google-common-protos:1.12.0"
+    compile "org.projectlombok:lombok:1.18.6"
+    testImplementation "org.testng:testng:7.0.0-beta3"
+
+
+    compile group: 'org.springframework.boot', name: 'spring-boot-starter-web', version:'2.0.4.RELEASE'
+    compile group: 'org.springframework.boot', name: 'spring-boot-starter-mail', version:'2.0.4.RELEASE'
+    compile group: 'org.springframework.boot', name: 'spring-boot-starter-quartz', version:'2.0.4.RELEASE'
+    compile group: 'commons-dbcp', name: 'commons-dbcp', version:'1.2.2'
+    compile group: 'org.springframework.boot', name: 'spring-boot-starter-jdbc', version:'2.0.4.RELEASE'
+    runtime group: 'org.postgresql', name: 'postgresql', version:'42.2.4'
+    testCompile group: 'org.springframework.boot', name: 'spring-boot-starter-test', version:'2.0.4.RELEASE'
+}
+
+
+sourceSets {
+    main {
+        proto {
+            srcDir "${projectDir}/src/main/proto"
+            include "**/*.proto"
+        }
+        java {
+            srcDirs "src/generated/main/grpc", "src/generated/main/java"
+        }
+    }
+
+    test {
+        java {
+            srcDirs "src/test/java"
+        }
+
+    }
+}
+
+task downloadProto(type:Exec) {
+    commandLine "sh","-c","rm -rf src/main/proto/"
+    commandLine "sh","-c","git archive --remote=${apiRepo} --prefix=src/main/proto/ ${apiBranch}:accelaero/${apiName}/proto |  tar xvf -"
+}
+
+task cleanProtoGen {
+    delete "${projectDir}/src/generated/main/grpc"
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${protocVersion}"
+    }
+
+    plugins {
+        grpc {
+            artifact = "io.grpc:protoc-gen-grpc-java:${grpcVersion}"
+        }
+    }
+
+    generateProtoTasks.generatedFilesBaseDir = "${projectDir}/src/generated"
+
+    generateProtoTasks {
+
+        all().each { task ->
+            task.plugins {
+                grpc {
+                }
+            }
+        }
+    }
+}
+
+
+task buildDocker(type: Docker, dependsOn: build) {
+    push = false
+    project.group = projectGroup
+    project.archivesBaseName = archiveName
+    applicationName = archiveName
+    dockerfile = file('src/main/docker/Dockerfile')
+    doFirst {
+        copy {
+            from jar
+            into stageDir
+        }
+    }
+}

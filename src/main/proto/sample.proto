@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package aeroinventory;
+
+option java_multiple_files = true;
+
+import "google/api/annotations.proto";
+
+option java_package = "com.accelaero.aeroinventory.sample";
+
+message ChargeQuoteRequest {
+    string flightNumber = 1;
+}
+
+message ChargeQuoteResponse {
+    int32 totalAmount = 1;
+}
+
+service SampleService {
+    rpc quoteCharge(ChargeQuoteRequest) returns (ChargeQuoteResponse){
+        option(google.api.http) = {
+            get: "/aeroinventory/sampleservice/{flightNumber}"
+        };
+    }
+
+    rpc quoteChargeByPost(ChargeQuoteRequest) returns (ChargeQuoteResponse){
+        option(google.api.http) = {
+            post: "/aeroinventory/sampleservice/quoteChargeByPost"
+            body: "*"
+        };
+    }
+}
